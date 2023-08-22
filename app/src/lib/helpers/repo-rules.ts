@@ -1,4 +1,4 @@
-import { RE2, RE2JS } from 're2js'
+import { RE2JS } from 're2js'
 import {
   RepoRulesInfo,
   IRepoRulesMetadataRule,
@@ -49,7 +49,11 @@ export function useRepoRulesLogic(
   // the free plan but the owner is a pro member, then repo rules could still be enabled.
   // errors will be thrown by the API in this case, but there's no way to preemptively
   // check for that.
-  if (account.login === owner.login && account.plan === 'free' && isPrivate) {
+  if (
+    account.login === owner.login &&
+    (!account.plan || account.plan === 'free') &&
+    isPrivate
+  ) {
     return false
   }
 
@@ -174,7 +178,7 @@ function toMatcher(
     return () => false
   }
 
-  let regex: RE2
+  let regex: RE2JS
 
   switch (rule.operator) {
     case APIRepoRuleMetadataOperator.StartsWith:

@@ -117,6 +117,10 @@ export interface IButtonProps {
    */
   readonly ariaLabel?: string
 
+  /** If a button has a sentence type further description than it's label or
+   * contents */
+  readonly ariaDescribedBy?: string
+
   /**
    * Whether to only show the tooltip when the tooltip target overflows its
    * bounds. Typically this is used in conjunction with an ellipsis CSS ruleset.
@@ -134,6 +138,9 @@ export interface IButtonProps {
 
   /** Whether the input field should auto focus when mounted. */
   readonly autoFocus?: boolean
+
+  /** Specify the direction of the tooltip */
+  readonly toolTipDirection?: TooltipDirection
 }
 
 /**
@@ -187,6 +194,7 @@ export class Button extends React.Component<IButtonProps, {}> {
         aria-expanded={this.props.ariaExpanded}
         aria-disabled={disabled ? 'true' : undefined}
         aria-label={this.props.ariaLabel}
+        aria-describedby={this.props.ariaDescribedBy}
         aria-haspopup={this.props.ariaHaspopup}
         aria-pressed={this.props.ariaPressed}
         autoFocus={this.props.autoFocus}
@@ -194,9 +202,9 @@ export class Button extends React.Component<IButtonProps, {}> {
         {tooltip && (
           <Tooltip
             target={this.innerButtonRef}
-            direction={TooltipDirection.NORTH}
+            direction={this.props.toolTipDirection ?? TooltipDirection.NORTH}
             // Show the tooltip immediately on hover if the button is disabled
-            delay={disabled && tooltip ? 0 : undefined}
+            delay={disabled ? 0 : undefined}
             onlyWhenOverflowed={this.props.onlyShowTooltipWhenOverflowed}
           >
             {tooltip}
