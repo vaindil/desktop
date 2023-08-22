@@ -4,7 +4,7 @@ import {
   IAPIRepoRule,
   IAPIRepoRuleset,
 } from '../../src/lib/api'
-import { parseRepoRules } from '../../src/lib/helpers/repo-rules'
+import { getRulesetsApplicableToBranchName, parseRepoRules } from '../../src/lib/helpers/repo-rules'
 import {
   RepoRulesMetadataFailures,
   RepoRulesMetadataStatus,
@@ -118,6 +118,7 @@ const rulesets: ReadonlyMap<number, IAPIRepoRuleset> = new Map([
     1,
     {
       id: 1,
+      conditions: {},
       current_user_can_bypass: 'never',
     },
   ],
@@ -125,6 +126,7 @@ const rulesets: ReadonlyMap<number, IAPIRepoRuleset> = new Map([
     2,
     {
       id: 2,
+      conditions: {},
       current_user_can_bypass: 'always',
     },
   ],
@@ -322,5 +324,72 @@ describe('repo metadata rules', () => {
         'must match the regular expression "(?m)^foo"'
       )
     })
+  })
+})
+
+describe('minimatch behavior', () => {
+  function generateRulesets(patterns: { include: string[], exclude: string[]}[]): ReadonlyMap<number, IAPIRepoRuleset> {
+    const rulesets: IAPIRepoRuleset[] = patterns.map<IAPIRepoRuleset>((p, i) => {
+      const rs: IAPIRepoRuleset = {
+        id: i,
+        conditions: {},
+        current_user_can_bypass: 'never',
+      }
+
+      if (p.include.length > 0 || p.exclude.length > 0) {
+        rs.conditions.ref_name = {
+          include: p.include,
+          exclude: p.exclude
+        }
+      }
+
+      return rs
+    })
+
+    return new Map(rulesets.map((r) => [r.id, r]))
+  }
+
+  function generateRuleset(include: string[], exclude: string[]): ReadonlyMap<number, IAPIRepoRuleset> {
+    return generateRulesets([{ include, exclude }])
+  }
+
+  function checkMatch(branchName: string, rulesets: ReadonlyMap<number, IAPIRepoRuleset>, expectedLength: number): void {
+    const result = getRulesetsApplicableToBranchName(branchName, rulesets, null)
+    expect(result.length).toBe(expectedLength)
+  }
+
+  it('does not match when no conditions provided', () => {
+    const rs = generateRuleset([], [])
+    checkMatch('foo', rs, 0)
+  })
+
+  it('is case-sensitive', () => {
+    const rs = generateRuleset(['foo'], [])
+    checkMatch('foo', rs, 1)
+    checkMatch('fOo', rs, 0)
+  })
+
+  it('does not match partial names', () => {
+    const rs = generateRuleset(['foo'], [])
+    checkMatch('foooo', rs, 0)
+    checkMatch('fffoo', rs, 0)
+    checkMatch('foo/bar', rs, 0)
+    checkMatch('bar/foo', rs, 0)
+  })
+
+  it('matches directory style branches correctly', () => {
+    const rsOneLevel = generateRuleset(['foo/**'], [])
+    checkMatch('foo', rsOneLevel, 0)
+    checkMatch('foo/bar', rsOneLevel, 1)
+    checkMatch('foo/bar/baz', rsOneLevel, 0)
+    checkMatch('foo/bar/baz/extra', rsOneLevel, 0)
+    checkMatch('bar/foo', rsOneLevel, 0)
+
+    const rsAllLevels = generateRuleset(['foo/**/**'], [])
+    checkMatch('foo', rsAllLevels, 0)
+    checkMatch('foo/bar', rsAllLevels, 1)
+    checkMatch('foo/bar/baz', rsAllLevels, 1)
+    checkMatch('foo/bar/baz/extra', rsOneLevel, 1)
+    checkMatch('bar/foo', rsAllLevels, 0)
   })
 })

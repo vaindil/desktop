@@ -540,6 +540,17 @@ export interface IAPISlimRepoRuleset {
  */
 export interface IAPIRepoRuleset extends IAPISlimRepoRuleset {
   /**
+   * Contains the branch name patterns that this ruleset applies to,
+   * using Ruby fnmatch syntax
+   */
+  readonly conditions: {
+    ref_name?: {
+      exclude?: ReadonlyArray<string>
+      include?: ReadonlyArray<string>
+    }
+  }
+
+  /**
    * Whether the user making the API request can bypass the ruleset.
    */
   readonly current_user_can_bypass: 'always' | 'pull_requests_only' | 'never'

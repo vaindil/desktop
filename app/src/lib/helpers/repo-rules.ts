@@ -19,6 +19,20 @@ import {
   Repository,
   isRepositoryWithGitHubRepository,
 } from '../../models/repository'
+import { minimatch, MinimatchOptions } from 'minimatch'
+
+// these are chosen to make the minimatch behavior match
+// Ruby's File.fnmatch behavior with only the `File::FNM_PATHNAME`
+// flag set
+export const REPO_RULES_MINIMATCH_OPTIONS: MinimatchOptions = {
+  nobrace: true,
+  nocomment: true,
+  noext: true,
+  // noglobstar: true,
+  nonegate: true,
+  optimizationLevel: 0,
+  preserveMultipleSlashes: true,
+}
 
 /**
  * Returns whether repo rules could potentially exist for the provided account and repository.
@@ -123,6 +137,84 @@ export function parseRepoRules(
   }
 
   return info
+}
+
+/**
+ * Returns rulesets that apply to the provided branch name by performing an fnmatch-style check.
+ */
+export function getRulesetsApplicableToBranchName(
+  branchName: string,
+  rulesets: ReadonlyMap<number, IAPIRepoRuleset>,
+  defaultBranchName: string | null
+): ReadonlyArray<IAPIRepoRuleset> {
+  const applicableRulesets: IAPIRepoRuleset[] = []
+
+  if (!branchName || rulesets.size === 0) {
+    return applicableRulesets
+  }
+
+  for (const rs of rulesets.values()) {
+    const included = rs.conditions?.ref_name?.include
+    const excluded = rs.conditions?.ref_name?.exclude
+
+    // if there are no rules, then there's nothing to match against
+    if (
+      (!included || included.length === 0) &&
+      (!excluded || excluded.length === 0)
+    ) {
+      continue
+    }
+
+    let applies = branchNameMatchesPatterns(
+      branchName,
+      included,
+      defaultBranchName,
+      true
+    )
+
+    // no need to check exclusions if it doesn't match the inclusions
+    if (!applies) {
+      continue
+    }
+
+    applies = !branchNameMatchesPatterns(
+      branchName,
+      excluded,
+      defaultBranchName,
+      false
+    )
+
+    if (applies) {
+      applicableRulesets.push(rs)
+    }
+  }
+
+  return applicableRulesets
+}
+
+function branchNameMatchesPatterns(
+  branchName: string,
+  patterns: ReadonlyArray<string> | undefined,
+  defaultBranchName: string | null,
+  matchKeywords: boolean
+): boolean {
+  for (const p of patterns ?? []) {
+    if (
+      matchKeywords &&
+      (p === '~ALL' ||
+        (p === '~DEFAULT' &&
+          defaultBranchName &&
+          defaultBranchName === branchName))
+    ) {
+      return true
+    }
+
+    if (minimatch.match([branchName], p, REPO_RULES_MINIMATCH_OPTIONS).length > 0) {
+      return true
+    }
+  }
+
+  return false
 }
 
 function toMetadataRule(
