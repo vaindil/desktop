@@ -1197,9 +1197,10 @@ export class AppStore extends TypedBaseStore<IAppState> {
         )
 
         if (branchRules.length > 0) {
-          currentRepoRulesInfo = parseRepoRules(
+          currentRepoRulesInfo = await parseRepoRules(
             branchRules,
-            this.cachedRepoRulesets
+            this.cachedRepoRulesets,
+            repository
           )
         }
       }
@@ -2655,6 +2656,8 @@ export class AppStore extends TypedBaseStore<IAppState> {
     } else {
       assertNever(conflictState, `Unsupported conflict kind`)
     }
+
+    this.statsStore.recordMergeConflictFromExplicitMerge()
 
     this._setMultiCommitOperationStep(repository, {
       kind: MultiCommitOperationStepKind.ShowConflicts,
